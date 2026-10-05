@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tanya tentang Yusuf</title>
+    <style>
+      :root {
+        --paper: #f4f1ea;
+        --ink: #1a1a17;
+        --stone: #5c564b;
+        --rule: #d9d3c7;
+        --ember: #b54418;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; height: 100dvh; display: flex; flex-direction: column;
+        background: var(--paper); color: var(--ink);
+        font: 15px/1.6 "IBM Plex Sans", system-ui, sans-serif;
+      }
+      #log { flex: 1; overflow-y: auto; padding: 24px; }
+      .turn { max-width: 44rem; margin: 0 auto 20px; }
+      .who {
+        font: 11px/1 ui-monospace, monospace; letter-spacing: .08em;
+        text-transform: uppercase; color: var(--stone); margin-bottom: 6px;
+      }
+      .you .who { color: var(--ember); }
+      .hint { max-width: 44rem; margin: 0 auto 20px; color: var(--stone); }
+      .seed {
+        font: inherit; background: none; color: var(--stone); cursor: pointer;
+        border: 1px solid var(--rule); border-radius: 4px;
+        padding: 6px 10px; margin: 4px 6px 0 0; text-align: left;
+      }
+      .seed:hover { border-color: var(--ember); color: var(--ink); }
+      form {
+        display: flex; gap: 8px; padding: 16px 24px;
+        border-top: 1px solid var(--rule);
+      }
+      input, button[type="submit"] {
+        font: inherit; border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px;
+      }
+      input { flex: 1; min-width: 0; background: #fff; color: var(--ink); }
+      input:focus-visible, .seed:focus-visible, button:focus-visible {
+        outline: 2px solid var(--ember); outline-offset: 2px;
+      }
+      button[type="submit"] {
+        background: var(--ink); color: var(--paper); border-color: var(--ink); cursor: pointer;
+      }
+      button[type="submit"]:disabled { opacity: .5; cursor: default; }
+    </style>
+  </head>
+  <body>
+    <div id="log">
+      <div class="hint">
+        <p>
+          Asisten ini hanya tahu isi CV dan catatan proyek Yusuf. Kalau jawabannya tidak ada
+          di situ, dia akan bilang tidak tahu. Batas 20 pertanyaan per jam.
+        </p>
+        <div id="seeds"></div>
+      </div>
+    </div>
+    <form id="form">
+      <input id="q" autocomplete="off" placeholder="Tulis pertanyaan" required />
+      <button type="submit" id="send">Kirim</button>
+    </form>
+    <script>
+      const log = document.getElementById("log");
+      const form = document.getElementById("form");
+      const q = document.getElementById("q");
+      const send = document.getElementById("send");
+      const history = [];
+
+      const SEEDS = [
+        "Apa pengalaman kerja Yusuf?",
+        "Seberapa akurat model prediksi harga rumahnya?",
+        "Apa batasan terbesar dari proyek rekomendasinya?",
+        "Apakah dia pernah pakai LLM di pekerjaan nyata?",
+      ];
+      document.getElementById("seeds").append(
+        ...SEEDS.map((s) => {
+          const b = document.createElement("button");
+          b.className = "seed";
+          b.textContent = s;
+          b.onclick = () => ask(s);
+          return b;
+        })
+      );
+
+      function turn(who, text, cls) {
+        const d = document.createElement("div");
+        d.className = "turn " + cls;
+        d.innerHTML = '<div class="who"></div><div class="body"></div>';
+        d.querySelector(".who").textContent = who;
+        d.querySelector(".body").textContent = text;
+        log.append(d);
+        log.scrollTop = log.scrollHeight;
+        return d.querySelector(".body");
+      }
+
+      async function ask(text) {
+        turn("Kamu", text, "you");
+        const out = turn("Asisten", "Mengetik", "bot");
+        history.push({ role: "user", content: text });
+        send.disabled = true;
+        try {
+          const res = await fetch("/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ messages: history }),
+          });
+          const data = await res.json();
+          const reply = res.ok ? data.reply : data.detail || "Terjadi kesalahan.";
+          out.textContent = reply;
+          if (res.ok) history.push({ role: "assistant", content: reply });
+        } catch {
+          out.textContent = "Tidak bisa menghubungi server.";
+        }
+        send.disabled = false;
+        log.scrollTop = log.scrollHeight;
+      }
+
+      form.onsubmit = (e) => {
+        e.preventDefault();
+        const text = q.value.trim();
+        if (!text) return;
+        q.value = "";
+        ask(text);
+      };
+    </script>
+  </body>
+</html>
